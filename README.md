@@ -16,9 +16,8 @@
     * [Funcionalidades](#funcionalidades)
     * [Roadmap](#roadmap)
 3. Ramas
-    + [Aldi_branch](https://github.com/FMartine7i/moodify_api/tree/aldi_branch)
-    + [Jessi_branch](https://github.com/FMartine7i/moodify_api/tree/jessii_branch)
-    + [Fede_branch](https://github.com/FMartine7i/moodify_api/tree/fede_branch)
+    + [aldi_branch](https://github.com/FMartine7i/moodify_api/tree/aldi_branch)
+    + [jessi_branch](https://github.com/FMartine7i/moodify_api/tree/jessii_branch)
 
 ## Descripción
 **moodify** es una app que permite a los usuarios encontrar playlists, canciones y álbums basados en su **estado de ánimo** actual.
@@ -28,7 +27,7 @@
 > [!NOTE]
 > Tener instalado Flutter SDK y Dart. Editor de código recomendado: Visual Studio Code.
 ### Instalación
-> - Clonar repositorio del Frontend: ``https://github.com/FMartine7i/flutter_app_2024.git``
+> - Clonar repositorio del Frontend: ``https://github.com/AldanaAranda/Moodify-App.git``
 > - ``cd flutter_app_2024``
 > - Instalar dependencias con: ``flutter pub get``
 ### Ejecución
