@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/playlist_provider.dart';
 
 class PlaylistListItem extends StatefulWidget {
   final int index;
@@ -21,6 +24,46 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
   bool _isFavorite = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  /// Cargar favoritos y comentario desde SharedPreferences
+  Future<void> _loadData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String playlistId = widget.playlist['id'];
+
+    setState(() {
+      _isFavorite = prefs.getBool('fav_$playlistId') ?? false;
+      _savedComment = prefs.getString('comment_$playlistId');
+    });
+  }
+
+  /// Guardar el comentario en SharedPreferences
+  Future<void> _saveComment() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String playlistId = widget.playlist['id'];
+    await prefs.setString('comment_$playlistId', _savedComment ?? '');
+  }
+
+  /// Guardar estado de favorito en SharedPreferences
+  Future<void> _toggleFavorite() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String playlistId = widget.playlist['id'];
+
+    setState(() {
+      _isFavorite = !_isFavorite;
+    });
+
+    await prefs.setBool('fav_$playlistId', _isFavorite);
+
+    // También actualizar el Provider global
+    Provider.of<PlaylistProvider>(context, listen: false)
+        .toggleFavorite(int.parse(playlistId));
+  }
+
+  @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
@@ -29,10 +72,20 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
   @override
   Widget build(BuildContext context) {
     print("🔎 Imagen recibida en PlaylistListItem: ${widget.playlist['playlistCover']}");
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.playlist['playlistName']),
         backgroundColor: const Color.fromARGB(255, 67, 37, 81),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isFavorite ? Icons.star : Icons.star_border,
+              color: _isFavorite ? Colors.amber : Colors.white,
+            ),
+            onPressed: _toggleFavorite,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -50,8 +103,7 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
                     image: widget.playlist['playlistCover'] != null &&
                             widget.playlist['playlistCover'].isNotEmpty
                         ? NetworkImage(widget.playlist['playlistCover'])
-                        : const AssetImage('assets/images/album.png')
-                            as ImageProvider,
+                        : const AssetImage('assets/images/album.png') as ImageProvider,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -59,7 +111,7 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
               const SizedBox(height: 20),
 
               Text(
-                "${widget.playlist['playlistName']}",
+                widget.playlist['playlistName'],
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 30,
@@ -87,24 +139,7 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
                       },
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Marcar como favorito',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        Switch(
-                          value: _isFavorite,
-                          onChanged: (value) {
-                            setState(() {
-                              _isFavorite = value;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
+
                     Center(
                       child: ElevatedButton(
                         onPressed: () {
@@ -113,6 +148,9 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
                               _savedComment = _commentController.text;
                               _commentController.clear();
                             });
+
+                            _saveComment();
+
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Comentario guardado'),
@@ -121,8 +159,7 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color.fromARGB(255, 67, 37, 81),
+                          backgroundColor: const Color.fromARGB(255, 67, 37, 81),
                         ),
                         child: const Text('Guardar comentario'),
                       ),
@@ -131,11 +168,11 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
                 ),
               ),
               const SizedBox(height: 20),
-              if (_savedComment != null)
+
+              if (_savedComment != null && _savedComment!.isNotEmpty)
                 Text(
                   'Comentario guardado: $_savedComment',
-                  style: const TextStyle(
-                      fontSize: 16, fontStyle: FontStyle.italic),
+                  style: const TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
                 ),
             ],
           ),
