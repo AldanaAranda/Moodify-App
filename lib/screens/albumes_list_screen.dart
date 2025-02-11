@@ -14,40 +14,31 @@ class AlbumesListScreen extends StatefulWidget {
 
 class _AlbumesListScreenState extends State<AlbumesListScreen> {
   late ApiService apiService;
-  List<Album> _albums = [];
-  List<Album> _filteredAlbums = [];
-  bool _isSearching = false;
+  List<Album> allAlbums = [];
+  List<Album> filteredAlbums = [];
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     apiService = ApiService();
-    _fetchAlbums(); // se llama a la funcion para obtener los albumes al iniciar
+    _fetchAlbums();
   }
 
   Future<void> _fetchAlbums() async {
-    try {
-      List<Album> albums = await apiService.fetchAlbums();
-      setState(() {
-        _albums = albums;
-        _filteredAlbums = albums;
-      });
-    } catch (e) {
-      debugPrint("Error al obtener álbumes: $e");
-    }
+    final response = await apiService.fetchAlbums();
+    setState(() {
+      allAlbums = response;
+      filteredAlbums = allAlbums; 
+    });
   }
 
-  // filtrar en la lista de albumes con lo que se escribe en el buscador
   void _filterAlbums(String query) {
     setState(() {
-      if (query.isEmpty) {
-        _filteredAlbums = _albums;
-      } else {
-        _filteredAlbums = _albums
-            .where((album) => album.name.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
+      filteredAlbums = allAlbums
+          .where((album) =>
+              album.name.toLowerCase().contains(query.toLowerCase()))
+          .toList();
     });
   }
 
@@ -57,76 +48,97 @@ class _AlbumesListScreenState extends State<AlbumesListScreen> {
       top: true,
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: const Color.fromARGB(255, 67, 37, 81), 
-          title: _isSearching
-              ? TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: "Buscar álbum...",
-                    hintStyle: TextStyle(color: Colors.white70),
-                    border: InputBorder.none,
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  onChanged: _filterAlbums,
-                )
-              : const Text(
-                  "Lista de Álbumes",
-                  style: TextStyle(color: Colors.white),
-                ),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  _isSearching = !_isSearching;
-                  if (!_isSearching) {
-                    _searchController.clear();
-                    _filterAlbums('');
-                  }
-                });
-              },
-            ),
-          ],
+          title: const Text('Álbumes'),
+          backgroundColor: Colors.purple, 
         ),
-        body: _filteredAlbums.isEmpty
-            ? const Center(child: Text("No hay álbumes disponibles."))
-            : ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                itemCount: _filteredAlbums.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final album = _filteredAlbums[index];
+        body: Column(
+          children: [
+            searchArea(),
+            Expanded(
+              child: FutureBuilder<List<Album>>(
+                future: apiService.fetchAlbums(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('No hay álbumes disponibles.'));
+                  }
 
-                  // se verifica si el album esta en favoritos
-                  final isFavorite = Provider.of<FavoriteAlbumsProvider>(context)
-                      .favoriteAlbums
-                      .any((favAlbum) => favAlbum['id'] == album.id);
+                  List<Album> albums = filteredAlbums;
+                  return ListView.builder(
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: albums.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final album = albums[index];
 
-                  return GestureDetector(
-                    onTap: () {
-                      // para ir a la pantalla de detalle del album
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AlbumDetailScreen(albumId: album.id),
+                      final isFavorite =
+                          Provider.of<FavoriteAlbumsProvider>(context)
+                              .favoriteAlbums
+                              .any((favAlbum) => favAlbum['id'] == album.id);
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  AlbumDetailScreen(albumId: album.id),
+                            ),
+                          );
+                        },
+                        child: AlbumCard(
+                          id: album.id,
+                          albumName: album.name,
+                          bandName: album.artists.isNotEmpty
+                              ? album.artists[0]
+                              : "Desconocido",
+                          year: album.releaseDate,
+                          imageUrl: album.image,
+                          isFavorite: isFavorite,
+                          onFavoriteToggle: () {
+                            Provider.of<FavoriteAlbumsProvider>(context,
+                                    listen: false)
+                                .toggleFavorite(
+                                    album.id, album.name, album.image);
+                          },
                         ),
                       );
                     },
-                    child: AlbumCard(
-                      id: album.id,
-                      albumName: album.name,
-                      bandName: album.artists.isNotEmpty ? album.artists[0] : "Desconocido",
-                      year: album.releaseDate,
-                      imageUrl: album.image,
-                      isFavorite: isFavorite,
-                      onFavoriteToggle: () {
-                        Provider.of<FavoriteAlbumsProvider>(context, listen: false)
-                            .toggleFavorite(album.id, album.name, album.image);
-                      },
-                    ),
                   );
                 },
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget searchArea() {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            icon: const Icon(Icons.keyboard_arrow_left_outlined),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filterAlbums,
+              decoration: const InputDecoration(
+                hintText: 'Buscar álbum...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -205,4 +217,3 @@ class AlbumCard extends StatelessWidget {
     );
   }
 }
-
