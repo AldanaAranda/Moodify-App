@@ -1,7 +1,7 @@
-// ignore_for_file: unused_field
-
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/playlist_provider.dart';
+import '../models/api_response.dart';
 import 'playlists_list_item.dart';
 
 class PlaylistsListScreen extends StatefulWidget {
@@ -13,7 +13,14 @@ class PlaylistsListScreen extends StatefulWidget {
 
 class PlaylistsListScreenState extends State<PlaylistsListScreen> {
   String _searchQuery = '';
-  final ApiService apiService = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<PlaylistProvider>(context, listen: false).fetchPlaylists();
+    });
+  }
 
   void _updateSearchQuery(String query) {
     setState(() {
@@ -23,74 +30,69 @@ class PlaylistsListScreenState extends State<PlaylistsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          decoration: const InputDecoration(
-            hintText: 'Buscar playlist...',
-            border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.white60),
+    return Consumer<PlaylistProvider>(
+      builder: (context, playlistProvider, child) {
+        final List<Playlist> playlists = playlistProvider.playlists.where((playlist) {
+          return playlist.nombre.toLowerCase().contains(_searchQuery.toLowerCase());
+        }).toList();
+
+        return Scaffold(
+          appBar: AppBar(
+            title: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Buscar playlist...',
+                border: InputBorder.none,
+                hintStyle: TextStyle(color: Colors.white60),
+              ),
+              style: const TextStyle(color: Colors.white),
+              onChanged: _updateSearchQuery,
+            ),
+            backgroundColor: const Color.fromARGB(255, 67, 37, 81),
           ),
-          style: const TextStyle(color: Colors.white),
-          onChanged: _updateSearchQuery,
-        ),
-        backgroundColor: const Color.fromARGB(255, 67, 37, 81),
-      ),
-      body: FutureBuilder<List<dynamic>>(
-        future: apiService.fetchPlaylists(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text("No hay playlists disponibles"));
-          }
-
-          List<dynamic> filteredPlaylists = snapshot.data!.where((playlist) {
-            return playlist['nombre']
-                    .toString()
-                    .toLowerCase()
-                    .contains(_searchQuery.toLowerCase()) ||
-                playlist['artistas']
-                    .toString()
-                    .toLowerCase()
-                    .contains(_searchQuery.toLowerCase());
-          }).toList();
-
-          return ListView.builder(
-            itemCount: filteredPlaylists.length,
-            itemBuilder: (context, index) {
-              final playlist = filteredPlaylists[index];
-              return GestureDetector(
-                onTap: () async {
-                  print("📡 Navegando a PlaylistListItem con imagen: ${playlist['imagen']}");
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PlaylistListItem(
-                        index: index,
-                        playlist: {
-                          'id': playlist['id']?.toString() ?? '',
-                          'playlistCover': playlist['imagen'] ?? '',
-                          'playlistName': playlist['nombre'] ?? 'Sin nombre',
-                        },
-                      ),
-                    ),
-                  );
-                  setState(() {});
-                },
-                child: PlaylistCard(
-                  index: index,
-                  id: playlist['id']?.toString() ?? '',
-                  imageUrl: playlist['imagen'] ?? 'assets/images/album.png',
-                  playlistName: playlist['nombre'] ?? 'Sin nombre',
-                ),
-              );
-            },
-          );
-        },
-      ),
+          body: playlistProvider.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : playlistProvider.errorMessage.isNotEmpty
+                  ? Center(child: Text("Error: ${playlistProvider.errorMessage}"))
+                  : playlists.isEmpty
+                      ? const Center(child: Text("No hay playlists disponibles"))
+                      : ListView.builder(
+                          itemCount: playlists.length,
+                          itemBuilder: (context, index) {
+                            final playlist = playlists[index];
+                            final bool isFav = playlistProvider.isFavorite(playlist.customId);
+                            return GestureDetector(
+                              onTap: () async {
+                                print("📡 Navegando a PlaylistListItem con imagen: ${playlist.imagen}");
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PlaylistListItem(
+                                      index: index,
+                                      playlist: {
+                                        'id': playlist.customId.toString(),
+                                        'playlistCover': playlist.imagen,
+                                        'playlistName': playlist.nombre,
+                                      },
+                                    ),
+                                  ),
+                                );
+                                setState(() {}); // Asegura la actualización de la UI
+                              },
+                              child: PlaylistCard(
+                                index: index,
+                                id: playlist.customId.toString(),
+                                imageUrl: playlist.imagen,
+                                playlistName: playlist.nombre,
+                                isFavorite: isFav,
+                                onFavoritePressed: () {
+                                  playlistProvider.toggleFavorite(playlist.customId);
+                                },
+                              ),
+                            );
+                          },
+                        ),
+        );
+      },
     );
   }
 }
@@ -100,6 +102,8 @@ class PlaylistCard extends StatelessWidget {
   final String id;
   final String imageUrl;
   final String playlistName;
+  final bool isFavorite;
+  final VoidCallback onFavoritePressed;
 
   const PlaylistCard({
     super.key,
@@ -107,6 +111,8 @@ class PlaylistCard extends StatelessWidget {
     required this.id,
     required this.imageUrl,
     required this.playlistName,
+    required this.isFavorite,
+    required this.onFavoritePressed,
   });
 
   @override
@@ -114,7 +120,9 @@ class PlaylistCard extends StatelessWidget {
     String finalImageUrl = (imageUrl.isNotEmpty && imageUrl.startsWith("http"))
         ? imageUrl
         : 'assets/images/album.png';
+
     print("🔎 Cargando imagen: $finalImageUrl");
+
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 10.0,
@@ -125,8 +133,7 @@ class PlaylistCard extends StatelessWidget {
             Image(
               image: finalImageUrl.startsWith("http")
                   ? NetworkImage(finalImageUrl)
-                  : const AssetImage('assets/images/album.png')
-                      as ImageProvider,
+                  : const AssetImage('assets/images/album.png') as ImageProvider,
               width: 100,
               height: 100,
               fit: BoxFit.cover,
@@ -138,11 +145,17 @@ class PlaylistCard extends StatelessWidget {
                 children: [
                   Text(
                     playlistName,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
+            ),
+            IconButton(
+              icon: Icon(
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: isFavorite ? Colors.purple : Colors.grey,
+              ),
+              onPressed: onFavoritePressed,
             ),
           ],
         ),
