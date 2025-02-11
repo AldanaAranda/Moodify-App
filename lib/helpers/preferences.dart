@@ -5,7 +5,7 @@ class Preferences {
   static late SharedPreferences _prefs;
 
   static Future<void> initShared() async {
-    _prefs = await SharedPreferences.getInstance();
+    _prefs = await SharedPreferences.getInstance();  //inicializa SharedPreferences.
   }
 
   static bool get darkmode {
@@ -14,6 +14,6 @@ class Preferences {
 
   static set darkmode(bool value) {
     _darkmode = value;
-    _prefs.setBool('darkmode', value);
+    _prefs.setBool('darkmode', value);  // guarda el valor de darkmode
   }
 }
