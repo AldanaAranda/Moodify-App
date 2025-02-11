@@ -80,8 +80,8 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
         actions: [
           IconButton(
             icon: Icon(
-              _isFavorite ? Icons.star : Icons.star_border,
-              color: _isFavorite ? Colors.amber : Colors.white,
+              _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.purple : Colors.white,
             ),
             onPressed: _toggleFavorite,
           ),
@@ -94,7 +94,6 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Imagen principal
               Container(
                 width: double.infinity,
                 height: 400,
@@ -181,3 +180,4 @@ class _PlaylistListItemState extends State<PlaylistListItem> {
     );
   }
 }
+

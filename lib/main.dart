@@ -7,13 +7,26 @@ import 'package:flutter_application_base/themes/default_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_application_base/providers/playlist_provider.dart';
+import 'providers/favorite_albums_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load();
+
+  await dotenv.load(fileName: ".env");
+  print("API URL: \${dotenv.env['API_URL']}");
+
   await Preferences.initShared();
 
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => FavoriteAlbumsProvider()),
+        //ChangeNotifierProvider(create: (_) => PlaylistProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

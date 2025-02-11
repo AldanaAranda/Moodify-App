@@ -149,8 +149,8 @@ class PlaylistCard extends StatelessWidget {
             ),
             IconButton(
               icon: Icon(
-                isFavorite ? Icons.star : Icons.star_border,
-                color: isFavorite ? Colors.amber : Colors.grey,
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: isFavorite ? Colors.purple : Colors.grey,
               ),
               onPressed: onFavoritePressed,
             ),

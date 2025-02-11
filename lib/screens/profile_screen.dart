@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_application_base/mocks/albumes_mock.dart'
-    show elementos;
 import 'package:flutter_application_base/mocks/usuario_mock.dart' show usuario;
 import 'package:flutter_application_base/mocks/songs_mock.dart' show elements;
+import 'package:provider/provider.dart';
+import '../providers/favorite_albums_provider.dart';
+import '../services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,15 +19,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   dynamic _image;
   String? assetImage;
   String _username = "Usuario";
-  List<Map<String, dynamic>> _likedSongs = [];
   List<Map<String, dynamic>> _favoriteAlbums = [];
+  List<Map<String, dynamic>> _likedSongs = [];
+
   bool _showFavorites = false;
+
+  late ApiService apiService;
 
   @override
   void initState() {
     super.initState();
+    apiService = ApiService();
     _loadProfileData();
   }
+
+  //carga los datos del perfil desde SharedPreferences
 
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -41,17 +48,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
       _username = prefs.getString('username') ?? usuario[0];
-
-      List<String>? favoriteAlbums = prefs.getStringList('favoriteAlbums');
-      _favoriteAlbums = favoriteAlbums?.map((id) {
-            return {
-              'albumName':
-                  elementos.firstWhere((album) => album[0].toString() == id)[1],
-              'image': 'assets/albumes/$id.jpg'
-            };
-          }).toList() ??
-          [];
-
       _likedSongs = elements
           .where((song) => song[5] == true)
           .map((song) => {
@@ -63,6 +59,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .toList();
     });
   }
+
+  //guarda los datos del perfil en SharedPreferences
 
   Future<void> _saveProfileData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -267,8 +265,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
+    final favoriteAlbumsProvider = Provider.of<FavoriteAlbumsProvider>(context);
+    final favoriteAlbums = favoriteAlbumsProvider.favoriteAlbums;
+
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color.fromARGB(255, 67, 37, 81), 
         centerTitle: true,
         title: const Text('Profile',
             style: TextStyle(fontSize: 22, fontFamily: 'Poppins')),
@@ -277,29 +279,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // Perfil de usuario
             SizedBox(
               width: double.infinity,
               height: size.height * 0.3,
               child: Center(
                 child: GestureDetector(
-                    onTap: () => _showImageOptions(context),
-                    child: Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color.fromARGB(255, 96, 18, 206),
-                            width: 2,
-                          )),
-                      child: _buildProfileImg(),
-                    )),
+                  onTap: () => _showImageOptions(context),
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color.fromARGB(255, 96, 18, 206),
+                        width: 2,
+                      ),
+                    ),
+                    child: _buildProfileImg(),
+                  ),
+                ),
               ),
             ),
+            // info de perfil y botones
             Padding(
               padding: const EdgeInsets.all(15),
               child: Column(
                 children: [
+                  // nombre de usuario y el boton para editarlo
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -325,127 +332,112 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          )),
-                      onPressed: _toggleFavoriteAlbums,
-                      child: Ink(
-                        decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Color.fromARGB(255, 112, 18, 195),
-                                Color.fromARGB(255, 84, 86, 235),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(10))),
-                        child: Container(
-                            alignment: Alignment.center,
-                            width: 180,
-                            height: 50,
-                            child: Text(
-                                _showFavorites
-                                    ? "ocultar"
-                                    : "ver álbumes favoritos",
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white))),
-                      )),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _toggleFavoriteAlbums,
+                    child: Ink(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color.fromARGB(255, 112, 18, 195),
+                            Color.fromARGB(255, 84, 86, 235),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.all(Radius.circular(10)),
+                      ),
+                      child: Container(
+                        alignment: Alignment.center,
+                        width: 180,
+                        height: 50,
+                        child: Text(
+                          _showFavorites ? "Ocultar" : "Ver álbumes favoritos",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
                   if (_showFavorites) ...[
                     const SizedBox(height: 20),
-                    _favoriteAlbums.isEmpty
+                    favoriteAlbums.isEmpty
                         ? const Text("No tienes álbumes favoritos.")
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: _favoriteAlbums.length,
-                            itemBuilder: (context, index) {
-                              final album = _favoriteAlbums[index];
-                              return ListTile(
-                                leading: Image.asset(
-                                  album['image']!,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                ),
-                                title: Text(album['albumName']!),
-                              );
-                            },
+                        : SizedBox(
+                            height: 300,
+                            child: ListView.builder(
+                              itemCount: favoriteAlbums.length,
+                              itemBuilder: (context, index) {
+                                final album = favoriteAlbums[index];
+                                return ListTile(
+                                  leading: Image.network(
+                                    album['image']!,
+                                    width: 50,
+                                    height: 50,
+                                    fit: BoxFit.cover,
+                                  ),
+                                  title: Text(album['albumName']!),
+                                );
+                              },
+                            ),
                           ),
                   ],
                   const SizedBox(height: 10),
                   ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          )),
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return Column(
-                              children: [
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "Playlist personalizada",
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    letterSpacing: 1.0,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return Column(
+                            children: [
+                              const SizedBox(height: 10),
+                              const Text(
+                                "Playlist personalizada",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  letterSpacing: 1.0,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const Divider(),
-                                Expanded(
-                                  child: _likedSongs.isEmpty
-                                      ? const Center(
-                                          child: Text("No hay canciones"),
-                                        )
-                                      : ListView.builder(
-                                          itemCount: _likedSongs.length,
-                                          itemBuilder: (context, index) {
-                                            final song = _likedSongs[index];
-                                            return ListTile(
-                                              leading: Image.asset(
-                                                song['songCover']!,
-                                                width: 50,
-                                                height: 50,
-                                                fit: BoxFit.cover,
-                                              ),
-                                              title: Text(song['songName']!),
-                                              subtitle: Text(
-                                                  "${song['artist']} - ${song['album']}"),
-                                            );
-                                          },
-                                        ),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                      child: Ink(
-                          decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Color.fromARGB(255, 117, 28, 219),
-                                  Color.fromARGB(255, 45, 136, 228),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
                               ),
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(10))),
-                          child: Container(
-                            alignment: Alignment.center,
-                            width: 180,
-                            height: 50,
-                            child: const Text("ver mis playlists",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white)),
-                          ))),
+                              const Divider(),
+                              Expanded(
+                                child: _likedSongs.isEmpty
+                                    ? const Center(
+                                        child: Text("No hay canciones"))
+                                    : ListView.builder(
+                                        itemCount: _likedSongs.length,
+                                        itemBuilder: (context, index) {
+                                          final song = _likedSongs[index];
+                                          return ListTile(
+                                            leading: Image.asset(
+                                              song['songCover']!,
+                                              width: 50,
+                                              height: 50,
+                                              fit: BoxFit.cover,
+                                            ),
+                                            title: Text(song['songName']!),
+                                            subtitle: Text(song['artist']!),
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                    child: const Text("Ver canciones favoritas"),
+                  ),
                 ],
               ),
             ),
